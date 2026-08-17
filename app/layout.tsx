@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { OoviqAnalytics } from './analytics';
+import { OoviqMonetization } from './monetization';
 
 export const metadata: Metadata = {
   title: 'OOVIQ — Small problems. Sorted.',
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <OoviqAnalytics />
+        <OoviqMonetization />
       </body>
     </html>
   );
