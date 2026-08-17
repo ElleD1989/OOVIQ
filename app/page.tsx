@@ -101,17 +101,14 @@ function getConversation(input: string) {
 }
 
 function getWouldYouRather(input: string) {
-  const text = clean(input).toLowerCase();
+  const text = clean(input);
 
-  if (text.includes('holiday') || text.includes('travel')) {
-    return 'Would you rather travel every month or never leave your city?';
+  if (!text) {
+    return "Would you rather choose between two options?";
   }
 
-  if (text.includes('food')) {
-    return 'Would you rather have unlimited free food or free travel?';
-  }
-
-  return 'Would you rather always be early or always be perfectly prepared?';
+  if (kind === "Would You Rather") {
+  return getWouldYouRather(input);
 }
 
 function getBudget(input: string) {
