@@ -69,6 +69,11 @@ export function OoviqAnalytics() {
         ? clean(control.querySelector('strong')?.textContent, 80)
         : currentTool();
 
+      if (control.classList.contains('pro-cta')) {
+        sendEvent('pro_interest', null, label);
+        return;
+      }
+
       if (control.classList.contains('card')) {
         sendEvent('tool_select', tool, label);
         return;
