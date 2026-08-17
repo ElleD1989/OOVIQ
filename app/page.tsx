@@ -13,6 +13,19 @@ const tools = [
   ['Budget Splitter', 'Split a bill quickly and fairly.', 'budget'],
 ];
 
+const numberWords: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+};
+
 function clean(value: string) {
   return value.trim();
 }
@@ -35,18 +48,13 @@ function getDecision(input: string) {
 }
 
 function getCaption(input: string) {
-  const text = clean(input) || 'today';
-
+  const text = clean(input).replace(/[.!?]+$/, '') || 'today';
   return `Small moment, big energy. ${text}.`;
 }
 
 function getUsername(input: string) {
-  const text = clean(input) || 'Vibe';
-
-  const word = text
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .slice(0, 10);
-
+  const text = clean(input);
+  const word = text.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
   return `${word || 'Vibe'}Vibe`;
 }
 
@@ -70,16 +78,23 @@ function getDate(input: string) {
 
 function getGift(input: string) {
   const text = clean(input).toLowerCase();
+  const amountMatch = text.match(/r\s*([\d\s,.]+)/i);
+  const amount = amountMatch ? Number(amountMatch[1].replace(/\s/g, '').replace(/,/g, '')) : null;
+  const budgetNote = amount && Number.isFinite(amount) ? ` Keep it within about R${amount.toFixed(0)}.` : '';
+
+  if (text.includes('mom') || text.includes('mother')) {
+    return `A personalised self-care gift, framed photo, or something connected to her favourite hobby.${budgetNote}`;
+  }
 
   if (text.includes('man') || text.includes('boyfriend') || text.includes('husband')) {
-    return 'A personalised experience, a useful upgrade, or a small gift paired with a handwritten note.';
+    return `A personalised experience, useful upgrade, or small gift paired with a handwritten note.${budgetNote}`;
   }
 
   if (text.includes('woman') || text.includes('girlfriend') || text.includes('wife')) {
-    return 'A personalised gift, a relaxing experience, or something connected to her favourite hobby.';
+    return `A personalised gift, relaxing experience, or something connected to her favourite hobby.${budgetNote}`;
   }
 
-  return 'Choose something personal, useful and connected to the person’s interests.';
+  return `Choose something personal, useful and connected to the person’s interests.${budgetNote}`;
 }
 
 function getConversation(input: string) {
@@ -107,44 +122,68 @@ function getWouldYouRather(input: string) {
     return 'Would you rather choose between two options?';
   }
 
-  return `Would you rather choose ${text}?`;
+  const options = text
+    .replace(/^would you rather\s+/i, '')
+    .replace(/\?+$/, '')
+    .trim();
+
+  return `Would you rather choose ${options}?`;
+}
+
+function parseAmount(value: string) {
+  let cleaned = value
+    .replace(/R\s*/i, '')
+    .trim()
+    .replace(/(\d)\s+(?=\d)/g, '$1');
+
+  const match = cleaned.match(/\d[\d,.]*/);
+  if (!match) return null;
+
+  let token = match[0];
+
+  if (token.includes('.') && token.includes(',')) {
+    if (token.lastIndexOf(',') > token.lastIndexOf('.')) {
+      token = token.replace(/\./g, '').replace(',', '.');
+    } else {
+      token = token.replace(/,/g, '');
+    }
+  } else if (token.includes(',')) {
+    const tail = token.split(',').pop() || '';
+    token = tail.length === 2 ? token.replace(',', '.') : token.replace(/,/g, '');
+  }
+
+  const amount = Number(token);
+  return Number.isFinite(amount) ? amount : null;
 }
 
 function getBudget(input: string) {
   const text = clean(input);
 
   if (!text) {
-    return 'Enter an amount, for example: 500 for 4 people.';
+    return 'Enter an amount, for example: R500 for 4 people.';
   }
 
-  const numbers = text.match(/\d+(?:[.,]\d+)?/g);
+  const normalized = text.replace(/(\d)\s+(?=\d)/g, '$1');
+  const numbers = normalized.match(/\d[\d,.]*/g) || [];
+  const amount = parseAmount(normalized);
 
-  if (!numbers || numbers.length === 0) {
-    return 'Please enter a valid amount, for example: 500 for 2 people.';
-  }
-
-  const amount = Number(numbers[0].replace(',', '.'));
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return 'Please enter a valid positive amount.';
+  if (amount === null || amount <= 0) {
+    return 'Please enter a valid amount, for example: R500 for 2 people.';
   }
 
   let people = 2;
 
   if (numbers.length >= 2) {
-    const possiblePeople = Number(numbers[1]);
-
-    if (
-      Number.isInteger(possiblePeople) &&
-      possiblePeople >= 1 &&
-      possiblePeople <= 100
-    ) {
+    const possiblePeople = Number(numbers[1].replace(/,/g, ''));
+    if (Number.isInteger(possiblePeople) && possiblePeople >= 1 && possiblePeople <= 100) {
       people = possiblePeople;
     }
+  } else {
+    const words = normalized.toLowerCase().match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/);
+    if (words) people = numberWords[words[1]];
   }
 
   const each = amount / people;
-
   return `Split result: R${each.toFixed(2)} each for ${people} ${people === 1 ? 'person' : 'people'}.`;
 }
 
@@ -152,28 +191,20 @@ function getResult(kind: string, input: string) {
   switch (kind) {
     case 'decision':
       return getDecision(input);
-
     case 'caption':
       return getCaption(input);
-
     case 'username':
       return getUsername(input);
-
     case 'date':
       return getDate(input);
-
     case 'gift':
       return getGift(input);
-
     case 'conversation':
       return getConversation(input);
-
     case 'wyr':
       return getWouldYouRather(input);
-
     case 'budget':
       return getBudget(input);
-
     default:
       return 'Tell OOVIQ what you need and we’ll sort it.';
   }
@@ -211,28 +242,27 @@ export default function Home() {
       <nav>
         <div className="logo">OOVIQ</div>
         <span>Small problems. Sorted.</span>
-        <button className="ghost">Sign in</button>
       </nav>
 
       <section className="hero">
         <p className="eyebrow">YOUR DIGITAL LIFE, SIMPLIFIED</p>
-
         <h1>
           Tell OOVIQ what you need.
           <br />
           <em>We&apos;ll sort it.</em>
         </h1>
-
         <p className="sub">
           Fast little tools for decisions, ideas, plans and everyday moments.
         </p>
       </section>
 
-      <section className="grid">
+      <section className="grid" aria-label="OOVIQ tools">
         {tools.map((tool) => (
           <button
             key={tool[2]}
+            type="button"
             className={`card ${active === tool[2] ? 'selected' : ''}`}
+            aria-pressed={active === tool[2]}
             onClick={() => selectTool(tool[2])}
           >
             <strong>{tool[0]}</strong>
@@ -241,9 +271,8 @@ export default function Home() {
         ))}
       </section>
 
-      <section className="work">
+      <section className="work" aria-label={`${current[0]} tool`}>
         <h2>{current[0]}</h2>
-
         <p>{current[1]}</p>
 
         <div className="row">
@@ -251,27 +280,23 @@ export default function Home() {
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                runTool();
-              }
+              if (event.key === 'Enter') runTool();
             }}
+            aria-label={`Input for ${current[0]}`}
             placeholder={
               active === 'budget'
-                ? 'Enter amount, e.g. 500 for 4 people'
+                ? 'Enter amount, e.g. R500 for 4 people'
                 : 'Tell OOVIQ a little more...'
             }
           />
-
-          <button onClick={runTool}>OOVIQ it</button>
+          <button type="button" onClick={runTool}>OOVIQ it</button>
         </div>
 
         {out && (
-          <div className="result">
+          <div className="result" aria-live="polite">
             <span>YOUR RESULT</span>
-
             <b>{out}</b>
-
-            <button className="share" onClick={copyResult}>
+            <button type="button" className="share" onClick={copyResult}>
               Copy result
             </button>
           </div>
@@ -280,7 +305,7 @@ export default function Home() {
 
       <footer>
         <span>© 2026 OOVIQ</span>
-        <span>18+ · Privacy · Terms</span>
+        <span>Privacy · Terms</span>
       </footer>
     </main>
   );
