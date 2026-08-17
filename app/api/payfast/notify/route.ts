@@ -5,6 +5,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const MERCHANT_ID = process.env.PAYFAST_MERCHANT_ID || '';
 const PASSPHRASE = process.env.PAYFAST_PASSPHRASE || '';
+const EXPECTED_AMOUNT = process.env.OOVIQ_PRO_PRICE || '49.00';
 
 function encode(value: string) {
   return encodeURIComponent(value.trim()).replace(/%20/g, '+');
@@ -16,6 +17,21 @@ function buildSignature(data: Record<string, string>) {
     .map(([key, value]) => `${key}=${encode(value)}`);
   const payload = PASSPHRASE ? `${pairs.join('&')}&passphrase=${encode(PASSPHRASE)}` : pairs.join('&');
   return createHash('md5').update(payload).digest('hex');
+}
+
+function getClientIp(request: NextRequest) {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return request.headers.get('x-real-ip') || '';
+}
+
+function isAllowedPayfastIp(ip: string) {
+  const configured = (process.env.PAYFAST_ALLOWED_IPS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (configured.length === 0) return false;
+  return configured.includes(ip);
 }
 
 async function notifySupabase(payload: Record<string, string>) {
@@ -45,12 +61,14 @@ export async function POST(request: NextRequest) {
   form.forEach((value, key) => { payload[key] = String(value); });
 
   if (!MERCHANT_ID || !PASSPHRASE) return new Response('Not configured', { status: 503 });
+  if (!isAllowedPayfastIp(getClientIp(request))) return new Response('Invalid source', { status: 403 });
   if (payload.merchant_id !== MERCHANT_ID) return new Response('Invalid merchant', { status: 400 });
   if (!payload.signature || buildSignature(payload) !== payload.signature) return new Response('Invalid signature', { status: 400 });
+  if (!payload.m_payment_id || !payload.email_address) return new Response('Invalid payment data', { status: 400 });
   if (payload.payment_status !== 'COMPLETE') return new Response('OK', { status: 200 });
 
-  const expectedAmount = '49.00';
-  if (Number(payload.amount_gross || 0).toFixed(2) !== expectedAmount) return new Response('Invalid amount', { status: 400 });
+  if (!/^\d+\.\d{2}$/.test(EXPECTED_AMOUNT)) return new Response('Invalid configuration', { status: 500 });
+  if (Number(payload.amount_gross || 0).toFixed(2) !== EXPECTED_AMOUNT) return new Response('Invalid amount', { status: 400 });
 
   try {
     await notifySupabase(payload);
