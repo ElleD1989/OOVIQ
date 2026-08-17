@@ -15,11 +15,11 @@ type Tool = {
 const tools: Tool[] = [
   { title: 'Help Me Decide', description: 'Make a quick decision without overthinking.', kind: 'decision', placeholder: 'Try: stay home or go out' },
   { title: 'Caption Maker', description: 'Get a ready-to-post caption in seconds.', kind: 'caption', placeholder: 'Try: sunset at the beach' },
-  { title: 'Username Maker', description: 'Generate memorable usernames.', kind: 'username', placeholder: 'Try: fashion, gaming, beauty' , allowBlank: true },
-  { title: 'Date Night Generator', description: 'Turn “what should we do?” into a plan.', kind: 'date', placeholder: 'Try: romantic, cheap, fun' , allowBlank: true },
+  { title: 'Username Maker', description: 'Generate memorable usernames.', kind: 'username', placeholder: 'Try: fashion, gaming, beauty', allowBlank: true },
+  { title: 'Date Night Generator', description: 'Turn “what should we do?” into a plan.', kind: 'date', placeholder: 'Try: romantic, cheap, fun', allowBlank: true },
   { title: 'Gift Finder', description: 'Get gift ideas for a person and budget.', kind: 'gift', placeholder: 'Try: gift for mom, R500' },
-  { title: 'Conversation Starters', description: 'Never run out of things to say.', kind: 'conversation', placeholder: 'Try: fun, relationship, work' , allowBlank: true },
-  { title: 'Would You Rather', description: 'Instant fun questions for friends.', kind: 'wyr', placeholder: 'Try: funny, food, travel' , allowBlank: true },
+  { title: 'Conversation Starters', description: 'Never run out of things to say.', kind: 'conversation', placeholder: 'Try: fun, relationship, work', allowBlank: true },
+  { title: 'Would You Rather', description: 'Instant fun questions for friends.', kind: 'wyr', placeholder: 'Try: funny, food, travel', allowBlank: true },
   { title: 'Budget Splitter', description: 'Split a bill quickly and fairly.', kind: 'budget', placeholder: 'Try: R500 for 4 people' },
 ];
 
@@ -126,8 +126,8 @@ function getGift(input: string) {
   const budgetNote = amount && amount > 0 ? ` Keep it within about R${amount.toFixed(0)}.` : '';
 
   if (text.includes('mom') || text.includes('mother')) return `A personalised self-care gift, framed photo, or something connected to her favourite hobby.${budgetNote}`;
-  if (text.includes('man') || text.includes('boyfriend') || text.includes('husband')) return `A personalised experience, useful upgrade, or small gift paired with a handwritten note.${budgetNote}`;
   if (text.includes('woman') || text.includes('girlfriend') || text.includes('wife')) return `A personalised gift, relaxing experience, or something connected to her favourite hobby.${budgetNote}`;
+  if (/\bman\b/.test(text) || text.includes('boyfriend') || text.includes('husband')) return `A personalised experience, useful upgrade, or small gift paired with a handwritten note.${budgetNote}`;
   return `Choose something personal, useful and connected to the person’s interests.${budgetNote}`;
 }
 
@@ -147,7 +147,9 @@ function getConversation(input: string) {
 function getWouldYouRather(input: string) {
   const text = clean(input).toLowerCase();
   const custom = clean(input).replace(/^would you rather\s+/i, '').replace(/\?+$/, '').trim();
-  if (custom && !['funny', 'food', 'travel', 'friends'].includes(text)) return `Would you rather choose ${custom}?`;
+  const theme = ['funny', 'food', 'travel', 'friends'].includes(text) || text === '';
+
+  if (custom && !theme) return `Would you rather choose ${custom}?`;
 
   const pair = pick(wyrPairs);
   return `Would you rather ${pair[0]}, or ${pair[1]}?`;
