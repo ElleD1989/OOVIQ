@@ -5,7 +5,7 @@ const PAYFAST_URL = process.env.PAYFAST_URL || 'https://www.payfast.co.za/eng/pr
 const MERCHANT_ID = process.env.PAYFAST_MERCHANT_ID || '';
 const MERCHANT_KEY = process.env.PAYFAST_MERCHANT_KEY || '';
 const PASSPHRASE = process.env.PAYFAST_PASSPHRASE || '';
-const PRICE = '49.00';
+const PRICE = process.env.OOVIQ_PRO_PRICE || '49.00';
 
 function encode(value: string) {
   return encodeURIComponent(value.trim()).replace(/%20/g, '+');
@@ -23,13 +23,21 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] || char);
 }
 
+function validPrice(value: string) {
+  return /^\d+\.\d{2}$/.test(value) && Number(value) >= 5;
+}
+
 export async function GET(request: NextRequest) {
   if (!MERCHANT_ID || !MERCHANT_KEY || !PASSPHRASE) {
     return new Response('OOVIQ Pro payments are being connected. Please try again shortly.', { status: 503 });
   }
 
+  if (!validPrice(PRICE)) {
+    return new Response('OOVIQ Pro payment configuration is invalid.', { status: 500 });
+  }
+
   const email = (request.nextUrl.searchParams.get('email') || '').trim();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || email.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return new Response('A valid email address is required.', { status: 400 });
   }
 
@@ -59,6 +67,6 @@ export async function GET(request: NextRequest) {
     .map(([name, value]) => `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}">`)
     .join('');
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Secure OOVIQ Pro Checkout</title></head><body><p>Taking you to secure checkout…</p><form id="payfast" method="post" action="${escapeHtml(PAYFAST_URL)}">${fields}</form><script>document.getElementById('payfast').submit()</script></body></html>`;
-  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Secure OOVIQ Pro Checkout</title></head><body><p>Taking you to secure checkout…</p><form id="payfast" method="post" action="${escapeHtml(PAYFAST_URL)}">${fields}</form><script>document.getElementById('payfast').submit()</script></body></html>`;
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
