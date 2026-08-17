@@ -104,11 +104,10 @@ function getWouldYouRather(input: string) {
   const text = clean(input);
 
   if (!text) {
-    return "Would you rather choose between two options?";
+    return 'Would you rather choose between two options?';
   }
 
-  if (kind === "Would You Rather") {
-  return getWouldYouRather(input);
+  return `Would you rather choose ${text}?`;
 }
 
 function getBudget(input: string) {
