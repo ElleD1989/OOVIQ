@@ -25,13 +25,30 @@ function getClientIp(request: NextRequest) {
   return request.headers.get('x-real-ip') || '';
 }
 
+function ipv4ToNumber(ip: string) {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return null;
+  return parts.reduce((result, part) => result * 256 + part, 0);
+}
+
+function ipInCidr(ip: string, cidr: string) {
+  const [network, prefixText] = cidr.split('/');
+  const ipNumber = ipv4ToNumber(ip);
+  const networkNumber = ipv4ToNumber(network);
+  const prefix = Number(prefixText);
+  if (ipNumber === null || networkNumber === null || !Number.isInteger(prefix) || prefix < 0 || prefix > 32) return false;
+  if (prefix === 0) return true;
+  const mask = (0xffffffff << (32 - prefix)) >>> 0;
+  return (ipNumber >>> 0 & mask) === (networkNumber >>> 0 & mask);
+}
+
 function isAllowedPayfastIp(ip: string) {
   const configured = (process.env.PAYFAST_ALLOWED_IPS || '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
   if (configured.length === 0) return false;
-  return configured.includes(ip);
+  return configured.some((range) => ipInCidr(ip, range));
 }
 
 async function notifySupabase(payload: Record<string, string>) {
