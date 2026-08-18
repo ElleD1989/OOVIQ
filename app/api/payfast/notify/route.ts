@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 import { NextRequest } from 'next/server';
 
+const IS_PREVIEW = process.env.VERCEL_ENV === 'preview';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const MERCHANT_ID = process.env.PAYFAST_MERCHANT_ID || '';
-const PASSPHRASE = process.env.PAYFAST_PASSPHRASE || '';
+const MERCHANT_ID = IS_PREVIEW ? '10000100' : process.env.PAYFAST_MERCHANT_ID || '';
+const PASSPHRASE = IS_PREVIEW ? 'jt7NOE43FZPn' : process.env.PAYFAST_PASSPHRASE || '';
 const EXPECTED_AMOUNT = process.env.OOVIQ_PRO_PRICE || '49.00';
 
 function encode(value: string) {
@@ -43,6 +44,7 @@ function ipInCidr(ip: string, cidr: string) {
 }
 
 function isAllowedPayfastIp(ip: string) {
+  if (IS_PREVIEW) return true;
   const configured = (process.env.PAYFAST_ALLOWED_IPS || '')
     .split(',')
     .map((value) => value.trim())
