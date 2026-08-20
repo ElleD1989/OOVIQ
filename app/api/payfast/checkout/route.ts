@@ -9,6 +9,9 @@ const MERCHANT_ID = IS_PREVIEW ? '10000100' : process.env.PAYFAST_MERCHANT_ID ||
 const MERCHANT_KEY = IS_PREVIEW ? '46f0cd694581a' : process.env.PAYFAST_MERCHANT_KEY || '';
 const PASSPHRASE = IS_PREVIEW ? 'jt7NOE43FZPn' : process.env.PAYFAST_PASSPHRASE || '';
 const PRICE = process.env.OOVIQ_PRO_PRICE || '49.00';
+const PAYFAST_NOTIFY_URL = IS_PREVIEW
+  ? 'https://nerflcrkjfhcjuperajn.supabase.co/functions/v1/payfast-itn'
+  : `${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/payfast/notify`;
 
 function encode(value: string) {
   return encodeURIComponent(value.trim()).replace(/%20/g, '+');
@@ -23,7 +26,7 @@ function signature(data: Record<string, string>) {
 }
 
 function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] || char);
+  return value.replace(/[&<>\"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' })[char] || char);
 }
 
 function validPrice(value: string) {
@@ -51,7 +54,7 @@ export async function GET(request: NextRequest) {
     merchant_key: MERCHANT_KEY,
     return_url: `${origin}/?payment=success`,
     cancel_url: `${origin}/?payment=cancelled`,
-    notify_url: `${origin}/api/payfast/notify`,
+    notify_url: PAYFAST_NOTIFY_URL,
     email_address: email,
     m_payment_id: paymentId,
     amount: PRICE,
