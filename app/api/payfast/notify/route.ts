@@ -1,11 +1,15 @@
 import { createHash } from 'node:crypto';
 import { NextRequest } from 'next/server';
 
+const IS_PREVIEW = process.env.VERCEL_ENV === 'preview';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const MERCHANT_ID = process.env.PAYFAST_MERCHANT_ID || '';
-const PASSPHRASE = process.env.PAYFAST_PASSPHRASE || '';
+const MERCHANT_ID = IS_PREVIEW ? '10000100' : process.env.PAYFAST_MERCHANT_ID || '';
+const PASSPHRASE = IS_PREVIEW ? 'jt7NOE43FZPn' : process.env.PAYFAST_PASSPHRASE || '';
 const EXPECTED_AMOUNT = process.env.OOVIQ_PRO_PRICE || '49.00';
+const PAYFAST_VALIDATE_URL = IS_PREVIEW
+  ? 'https://sandbox.payfast.co.za/eng/query/validate'
+  : 'https://www.payfast.co.za/eng/query/validate';
 
 function encode(value: string) {
   return encodeURIComponent(value.trim()).replace(/%20/g, '+');
@@ -43,6 +47,7 @@ function ipInCidr(ip: string, cidr: string) {
 }
 
 function isAllowedPayfastIp(ip: string) {
+  if (IS_PREVIEW) return true;
   const configured = (process.env.PAYFAST_ALLOWED_IPS || '')
     .split(',')
     .map((value) => value.trim())
@@ -51,9 +56,24 @@ function isAllowedPayfastIp(ip: string) {
   return configured.some((range) => ipInCidr(ip, range));
 }
 
-async function notifySupabase(payload: Record<string, string>) {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/subscriptions`, {
+async function validateWithPayfast(payload: Record<string, string>) {
+  const body = new URLSearchParams(payload).toString();
+  const response = await fetch(PAYFAST_VALIDATE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+    cache: 'no-store',
+  });
+  if (!response.ok) return false;
+  return (await response.text()).trim() === 'VALID';
+}
+
+async function saveSubscription(payload: Record<string, string>) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Supabase payment persistence is not configured');
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/subscriptions`, {
     method: 'POST',
     headers: {
       apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -63,13 +83,18 @@ async function notifySupabase(payload: Record<string, string>) {
     },
     body: JSON.stringify({
       provider: 'payfast',
-      provider_subscription_id: payload.token || null,
+      provider_subscription_id: payload.token || payload.m_payment_id,
       status: payload.payment_status === 'COMPLETE' ? 'active' : payload.payment_status?.toLowerCase() || 'pending',
       plan_code: 'pro_monthly',
       customer_email: payload.email_address || null,
       current_period_end: payload.billing_date || null,
     }),
   });
+
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 500);
+    throw new Error(`Supabase subscription write failed: ${response.status} ${detail}`);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -88,7 +113,10 @@ export async function POST(request: NextRequest) {
   if (Number(payload.amount_gross || 0).toFixed(2) !== EXPECTED_AMOUNT) return new Response('Invalid amount', { status: 400 });
 
   try {
-    await notifySupabase(payload);
+    if (!(await validateWithPayfast(payload))) {
+      return new Response('PayFast validation failed', { status: 400 });
+    }
+    await saveSubscription(payload);
   } catch {
     return new Response('Temporary processing error', { status: 500 });
   }

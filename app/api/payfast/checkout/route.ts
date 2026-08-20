@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
 import { NextRequest } from 'next/server';
 
-const PAYFAST_URL = process.env.PAYFAST_URL || 'https://www.payfast.co.za/eng/process';
-const MERCHANT_ID = process.env.PAYFAST_MERCHANT_ID || '';
-const MERCHANT_KEY = process.env.PAYFAST_MERCHANT_KEY || '';
-const PASSPHRASE = process.env.PAYFAST_PASSPHRASE || '';
+const IS_PREVIEW = process.env.VERCEL_ENV === 'preview';
+const PAYFAST_URL = IS_PREVIEW
+  ? 'https://sandbox.payfast.co.za/eng/process'
+  : process.env.PAYFAST_URL || 'https://www.payfast.co.za/eng/process';
+const MERCHANT_ID = IS_PREVIEW ? '10000100' : process.env.PAYFAST_MERCHANT_ID || '';
+const MERCHANT_KEY = IS_PREVIEW ? '46f0cd694581a' : process.env.PAYFAST_MERCHANT_KEY || '';
+const PASSPHRASE = IS_PREVIEW ? 'jt7NOE43FZPn' : process.env.PAYFAST_PASSPHRASE || '';
 const PRICE = process.env.OOVIQ_PRO_PRICE || '49.00';
 
 function encode(value: string) {
@@ -37,7 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   const email = (request.nextUrl.searchParams.get('email') || '').trim();
-  if (!email || email.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || email.length > 100 || !/^\S+@\S+\.\S+$/.test(email)) {
     return new Response('A valid email address is required.', { status: 400 });
   }
 
